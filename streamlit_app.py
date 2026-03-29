@@ -1,63 +1,71 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import pandas_ta as ta
+import plotly.graph_objects as go
 from datetime import datetime
 
-# Configuración de la página
-st.set_page_config(page_title="Analizador de ATH", layout="wide")
-st.title("📊 Análisis de Distancia al Máximo (200 Ruedas)")
+st.set_page_config(page_title="Analizador de ATH y RSI", layout="wide")
+st.title("📊 Análisis de Distancia al Máximo (200 Ruedas) e Indicadores")
 
 def color_distancia(val):
-    # Aplicamos tonos pastel según los rangos solicitados
     abs_val = abs(val)
     if abs_val <= 10:
-        color = '#FFD580'  # Naranja pastel
+        color = '#FFD580'
     elif abs_val <= 20:
-        color = '#FFB7B2'  # Rojo pastel
+        color = '#FFB7B2'
     else:
-        color = '#D1A7A7'  # Bordo pastel
+        color = '#D1A7A7'
     return f'background-color: {color}; color: black'
 
-# Sidebar para entrada de usuario
 st.sidebar.header("Configuración")
 tickers_default = "SPY, KSA, INDY, VEA, EWZ, GLD"
-tickers_input = st.sidebar.text_area("Introduce los tickers (separados por coma):", tickers_default)
+tickers_input = st.sidebar.text_area("Introduce los tickers:", tickers_default)
 
 if st.sidebar.button("Ejecutar Análisis"):
     tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
     resultados = []
-    
-    with st.spinner('Consultando datos de Yahoo Finance...'):
+
+    with st.spinner('Consultando Yahoo Finance...'):
         for ticker in tickers:
             try:
-                # Descargamos 1 año para tener margen de 200 ruedas
-                data = yf.download(ticker, period="1y", progress=False)
+                data = yf.download(ticker, period="1y", progress=False, auto_adjust=True)
                 if not data.empty:
+                    if isinstance(data.columns, pd.MultiIndex):
+                        data.columns = data.columns.get_level_values(0)
+                    
+                    data['RSI'] = ta.rsi(data['Close'], length=14)
                     df_200 = data.iloc[-200:]
-                    # Extraemos valores escalares
+
                     precio_actual = float(df_200['Close'].iloc[-1])
                     ath_200 = float(df_200['High'].max())
+                    rsi_actual = float(df_200['RSI'].iloc[-1])
                     distancia_pct = ((precio_actual - ath_200) / ath_200) * 100
-                    
+
                     resultados.append({
                         "Ticker": ticker,
-                        "Precio Actual": round(precio_actual, 2),
-                        "Precio ATH": round(ath_200, 2),
-                        "Distancia %": round(distancia_pct, 2)
+                        "Precio Actual": precio_actual,
+                        "Precio ATH": ath_200,
+                        "Distancia %": distancia_pct,
+                        "RSI": rsi_actual,
+                        "Data": df_200
                     })
             except Exception as e:
-                st.error(f"Error procesando {ticker}: {e}")
+                st.error(f"Error en {ticker}: {e}")
 
     if resultados:
-        df_resultado = pd.DataFrame(resultados)
-        
-        # Aplicar estilos y formato
+        df_resultado = pd.DataFrame([{k: v for k, v in r.items() if k != 'Data'} for r in resultados])
         styled_df = df_resultado.style.map(color_distancia, subset=['Distancia %'])\
-            .format({"Precio Actual": "{:.2f}", "Precio ATH": "{:.2f}", "Distancia %": "{:.2f}%"})
+            .format({"Precio Actual": "{:.2f}", "Precio ATH": "{:.2f}", "Distancia %": "{:.2f}%", "RSI": "{:.2f}"})
         
-        st.subheader(f"Resultados al {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+        st.subheader("Resumen de Activos")
         st.dataframe(styled_df, use_container_width=True)
-    else:
-        st.warning("No se encontraron datos para los tickers ingresados.")
-else:
-    st.info("Configura los tickers en el panel lateral y haz clic en 'Ejecutar Análisis'.")
+
+        st.subheader("Gráficos Interactivos")
+        for res in resultados:
+            with st.expander(f"Gráfico de {res['Ticker']}"):
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=res['Data'].index, y=res['Data']['Close'], name='Precio'))
+                fig.add_hline(y=res['Precio ATH'], line_dash="dash", line_color="red", annotation_text="ATH 200")
+                fig.update_layout(title=f"Evolución {res['Ticker']}", xaxis_title="Fecha", yaxis_title="Precio")
+                st.plotly_chart(fig, use_container_width=True)

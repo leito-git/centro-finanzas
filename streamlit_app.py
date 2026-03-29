@@ -1,21 +1,17 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
 import plotly.graph_objects as go
 from datetime import datetime
 
-st.set_page_config(page_title="Analizador de ATH y RSI", layout="wide")
-st.title("📊 Análisis de Distancia al Máximo (200 Ruedas) e Indicadores")
+st.set_page_config(page_title="Analizador de ATH", layout="wide")
+st.title("📊 Análisis de Distancia al Máximo (200 Ruedas)")
 
 def color_distancia(val):
     abs_val = abs(val)
-    if abs_val <= 10:
-        color = '#FFD580'
-    elif abs_val <= 20:
-        color = '#FFB7B2'
-    else:
-        color = '#D1A7A7'
+    if abs_val <= 10: color = '#FFD580'
+    elif abs_val <= 20: color = '#FFB7B2'
+    else: color = '#D1A7A7'
     return f'background-color: {color}; color: black'
 
 st.sidebar.header("Configuración")
@@ -33,13 +29,10 @@ if st.sidebar.button("Ejecutar Análisis"):
                 if not data.empty:
                     if isinstance(data.columns, pd.MultiIndex):
                         data.columns = data.columns.get_level_values(0)
-                    
-                    data['RSI'] = ta.rsi(data['Close'], length=14)
-                    df_200 = data.iloc[-200:]
 
+                    df_200 = data.iloc[-200:]
                     precio_actual = float(df_200['Close'].iloc[-1])
                     ath_200 = float(df_200['High'].max())
-                    rsi_actual = float(df_200['RSI'].iloc[-1])
                     distancia_pct = ((precio_actual - ath_200) / ath_200) * 100
 
                     resultados.append({
@@ -47,7 +40,6 @@ if st.sidebar.button("Ejecutar Análisis"):
                         "Precio Actual": precio_actual,
                         "Precio ATH": ath_200,
                         "Distancia %": distancia_pct,
-                        "RSI": rsi_actual,
                         "Data": df_200
                     })
             except Exception as e:
@@ -56,8 +48,8 @@ if st.sidebar.button("Ejecutar Análisis"):
     if resultados:
         df_resultado = pd.DataFrame([{k: v for k, v in r.items() if k != 'Data'} for r in resultados])
         styled_df = df_resultado.style.map(color_distancia, subset=['Distancia %'])\
-            .format({"Precio Actual": "{:.2f}", "Precio ATH": "{:.2f}", "Distancia %": "{:.2f}%", "RSI": "{:.2f}"})
-        
+            .format({"Precio Actual": "{:.2f}", "Precio ATH": "{:.2f}", "Distancia %": "{:.2f}%"})
+
         st.subheader("Resumen de Activos")
         st.dataframe(styled_df, use_container_width=True)
 

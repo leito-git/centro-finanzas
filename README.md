@@ -1,3 +1,3 @@
-# Analizador de Distancia al ATH con Gráficos Interactivos
+# Analizador de Distancia al ATH
 
-Esta aplicación de Streamlit calcula la distancia porcentual de una lista de activos respecto a su máximo de 200 ruedas e incluye visualizaciones interactivas con Plotly.
+Calcula la distancia al máximo de 200 ruedas con RSI y gráficos interactivos.
